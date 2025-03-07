@@ -14,10 +14,6 @@ on:
       
 
 jobs:
-  build:
-    outputs:
-      artifacts:
-        public: true
   pull_and_package:
     runs-on: ubuntu-22.04
 
