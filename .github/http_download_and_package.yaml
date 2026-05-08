@@ -1,0 +1,59 @@
+name: HTTP Download and Package
+on:
+  workflow_dispatch:
+    inputs:
+      download_urls:
+        description: '请填写下载链接，多个用英文逗号分开'
+        required: true
+        default: 'https://ubuntu.com'
+      artifact_name:
+        description: '请填写制品包名称'
+        required: true
+        default: 'downloaded-files'
+
+jobs:
+  download_and_package:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download Files and Compress
+      run: |
+        # 创建存放下载文件的临时目录
+        mkdir -p ./downloads
+        
+        # 读取输入并分割为数组
+        urls="${{ github.event.inputs.download_urls }}"
+        IFS=',' read -r -a url_array <<< "$urls"
+        
+        for url in "${url_array[@]}"; do
+          # 去除首尾空格
+          url=$(echo "$url" | xargs)
+          
+          # 获取文件名（从URL中提取最后一段）
+          filename=$(basename "$url")
+          
+          echo "正在下载: $url"
+          # 使用 curl 下载文件，-L 跟随重定向，-S 错误显示，-f 失败不报错
+          curl -L -f -S -o "./downloads/$filename" "$url"
+          
+          if [ -f "./downloads/$filename" ]; then
+            echo "正在压缩: $filename"
+            # 使用 xz 压缩文件
+            # -T0 使用所有 CPU 核心
+            # -8 高压缩率
+            xz -v -T0 -8 "./downloads/$filename"
+          else
+            echo "下载失败: $url"
+            exit 1
+          fi
+        done
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.inputs.artifact_name }}
+        path: ./downloads/*.xz
+        retention-days: 1
